@@ -1,5 +1,3 @@
 # NXT
 
-Organização da Plataforma NXT. Os repositórios são privados e o trabalho entra por pull request revisado.
-
-Site: [nex7.com](https://nex7.com)
+Organização da Plataforma NXT. Os repositórios de trabalho são privados e toda mudança entra por pull request revisado.
