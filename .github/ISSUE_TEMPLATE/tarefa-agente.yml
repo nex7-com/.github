@@ -1,0 +1,64 @@
+name: Tarefa para agente
+description: Tarefa pronta para um agente de IA executar e uma pessoa revisar.
+title: "[tarefa] "
+labels: ["tarefa"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Escreva para quem não conhece o contexto: o agente vai trabalhar só com o que estiver aqui e no `AGENTS.md` do repositório.
+  - type: textarea
+    id: objetivo
+    attributes:
+      label: Objetivo
+      description: O que deve existir ou funcionar no fim, em uma ou duas frases.
+    validations:
+      required: true
+  - type: textarea
+    id: contexto
+    attributes:
+      label: Contexto
+      description: Por que isso importa e o que já existe (arquivos, telas, decisões, links).
+    validations:
+      required: true
+  - type: textarea
+    id: onde
+    attributes:
+      label: Onde mexer
+      description: Pastas, pacotes ou arquivos afetados. Se não souber, escreva "a descobrir".
+    validations:
+      required: true
+  - type: textarea
+    id: aceite
+    attributes:
+      label: Critério de aceite
+      description: Como saber que terminou, de forma verificável. Um critério por linha.
+      placeholder: |
+        - a tela X abre sem erro no catálogo
+        - o teste Y passa
+    validations:
+      required: true
+  - type: textarea
+    id: testar
+    attributes:
+      label: Como testar
+      description: Comandos ou passos que provam o aceite.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: nao_fazer
+    attributes:
+      label: O que não fazer
+      description: Limites da tarefa (o que não mexer, o que não instalar, o que não publicar).
+    validations:
+      required: true
+  - type: dropdown
+    id: revisao
+    attributes:
+      label: Quem revisa
+      options:
+        - um owner
+        - o time dono do caminho (CODEOWNERS)
+    validations:
+      required: true

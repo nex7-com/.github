@@ -1,0 +1,42 @@
+name: Defeito
+description: Algo que funcionava, ou deveria funcionar, e não funciona.
+title: "[defeito] "
+labels: ["defeito"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Não cole token, senha, chave nem dado pessoal: troque por `<removido>`.
+  - type: textarea
+    id: aconteceu
+    attributes:
+      label: O que aconteceu
+    validations:
+      required: true
+  - type: textarea
+    id: esperado
+    attributes:
+      label: O que era esperado
+    validations:
+      required: true
+  - type: textarea
+    id: reproduzir
+    attributes:
+      label: Como reproduzir
+      description: Passos ou comandos, do começo.
+      render: shell
+    validations:
+      required: true
+  - type: input
+    id: onde
+    attributes:
+      label: Onde
+      description: Branch, versão, tela ou comando.
+    validations:
+      required: true
+  - type: textarea
+    id: evidencia
+    attributes:
+      label: Evidência
+      description: Mensagem de erro, saída do comando ou captura de tela.
+      render: text
