@@ -1,0 +1,13 @@
+name: CI da casa
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  modulo:
+    uses: nex7-com/.github/.github/workflows/modulo.yml@da740463bd18f1d978cdc6793869fa3b03e29d60

@@ -1,0 +1,38 @@
+name: Módulo da Plataforma
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  modulo:
+    name: modulo
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout da casa
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Ferramentas públicas imutáveis
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: nex7-com/.github
+          ref: aab2d659aba4de7b3080e5fee58d76acb1860a7f
+          path: .nxt-ci
+          persist-credentials: false
+      - name: Instalar versões fixadas no runner
+        run: python3 .nxt-ci/ferramentas/instalar_ci.py
+      - name: Segredos em todo o histórico (sem configuração do chamador)
+        run: gitleaks git . --config .nxt-ci/ferramentas/gitleaks.toml --gitleaks-ignore-path /dev/null --ignore-gitleaks-allow --redact --log-opts=--all
+      - name: Manifesto e SHA-256 das definições (offline)
+        run: python3 .nxt-ci/ferramentas/conferir_modulo.py .
+      - name: Actionlint e zizmor dos workflows da casa
+        run: python3 .nxt-ci/ferramentas/conferir_workflows.py
