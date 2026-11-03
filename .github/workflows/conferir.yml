@@ -21,10 +21,10 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Testes do verificador offline
-        run: python3 -m unittest discover -s tests -v
       - name: Ferramentas fixadas
         run: python3 ferramentas/instalar_ci.py
+      - name: Testes do verificador e da política de segredos (offline)
+        run: python3 -m unittest discover -s tests -v
       - name: Segredos
         run: gitleaks git . --config ferramentas/gitleaks.toml --gitleaks-ignore-path /dev/null --ignore-gitleaks-allow --redact --log-opts=--all
       - name: Workflows
