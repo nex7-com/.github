@@ -10,4 +10,4 @@ permissions:
 
 jobs:
   modulo:
-    uses: nex7-com/.github/.github/workflows/modulo.yml@602371137a638ab80d277d585b1486151d01cbd1
+    uses: nex7-com/.github/.github/workflows/modulo.yml@cdbec6ecc2dfd4f26ef6730b6a7d4a124d34923b
