@@ -147,4 +147,5 @@ description = "Lista sanitizada exata de marcadores do redator Rust"
 condition = "AND"
 paths = ['''(^|/)crates/gataka-core/src/redaction\.rs$''']
 regexTarget = "secret"
-regexes = ['''^-----begin private key-----",\s*"-----begin rsa private key-----",\s*"-----begin openai private key-----$''']
+# Os traços vão como `-{5}` para que o próprio texto da política (e as cópias dela) não tenha a forma de chave.
+regexes = ['''^-{5}begin private key-{5}",\s*"-{5}begin rsa private key-{5}",\s*"-{5}begin openai private key-{5}$''']
