@@ -1,8 +1,9 @@
-"""Confere o espelho da autoria sem banco, credencial ou repositório privado adicional."""
+"""Confere forma e propostas da autoria sem banco, credencial ou repositório privado adicional."""
 import argparse
 import hashlib
 import json
 import re
+import subprocess
 import sys
 import uuid
 from pathlib import Path, PurePosixPath
@@ -36,13 +37,33 @@ def ler(path):
 def relativo(valor):
     if not isinstance(valor, str) or not valor or "\\" in valor:
         raise ValueError("caminho inválido no índice")
+    if any(ord(char) < 32 or ord(char) == 127 for char in valor):
+        raise ValueError("caractere de controle no caminho")
     path = PurePosixPath(valor)
     if path.is_absolute() or any(p in {".", "..", ""} for p in valor.split("/")):
         raise ValueError("caminho fora do espelho")
     return valor
 
 
-def conferir(repo):
+class BaseDePropostaInvalida(ValueError):
+    """Erro estático, seguro para o log do CI."""
+
+
+def conferir_base(repo, ref):
+    arvore = subprocess.run(
+        ["git", "-C", str(repo), "rev-parse", "--verify", "--end-of-options", f"{ref}^{{tree}}"],
+        check=True, capture_output=True,
+    ).stdout.decode("ascii").strip()
+    for caminho in ("modulo.json", "definicoes/indice.json"):
+        anterior = subprocess.run(
+            ["git", "-C", str(repo), "show", f"{arvore}:.plataforma/{caminho}"],
+            check=True, capture_output=True,
+        ).stdout
+        if anterior != (repo / ".plataforma" / caminho).read_bytes():
+            raise BaseDePropostaInvalida("proposta deve manter o índice-base")
+
+
+def conferir(repo, ref_base=None):
     base = repo / ".plataforma"
     if base.is_symlink() or (base / "definicoes").is_symlink():
         raise ValueError("symlink na raiz do espelho")
@@ -81,33 +102,49 @@ def conferir(repo):
         if not re.fullmatch(r"[0-9a-f]{64}", item.get("sha256", "")):
             raise ValueError("SHA-256 inválido")
         if not isinstance(item.get("tipo"), str) or not item["tipo"]:
-            raise ValueError("tipo de definição ausente")
-        arquivo = base / "definicoes" / caminho
+            raise TypeError("tipo de definição ausente")
+        esperados[caminho] = item
+    documentos, hashes = {}, {}
+    for arquivo in (base / "definicoes").rglob("*"):
+        if not arquivo.is_file():
+            continue
+        caminho = relativo(arquivo.relative_to(base / "definicoes").as_posix())
+        if caminho == "indice.json":
+            continue
         documento = ler(arquivo)
-        if hashlib.sha256(arquivo.read_bytes()).hexdigest() != item["sha256"]:
-            raise ValueError("SHA-256 diverge do índice")
-        if documento.get("revisao") != item.get("revisao"):
+        digest = hashlib.sha256(arquivo.read_bytes()).hexdigest()
+        item = esperados.get(caminho)
+        # A revisão da proposta pode mudar; só o espelho sem alteração deve corresponder ao índice.
+        if item and digest == item["sha256"] and documento.get("revisao") != item.get("revisao"):
             raise ValueError("revisão diverge do índice")
-        esperados[caminho] = documento
-    encontrados = {p.relative_to(base / "definicoes").as_posix() for p in (base / "definicoes").rglob("*") if p.is_file()}
-    if encontrados != set(esperados) | {"indice.json"}:
-        raise ValueError("índice não cobre exatamente os arquivos de definições")
-    registro = esperados.get("_registro.json", {})
+        documentos[caminho], hashes[caminho] = documento, digest
+    registro = documentos.get("_registro.json", {})
     if registro.get("id") != casa or registro.get("uid") != modulo["uid"]:
-        raise ValueError("registro raiz e módulo divergem")
-    return {"ok": True, "documentos": len(esperados), "offline": True}
+        raise ValueError("registro raiz ausente ou divergente do módulo")
+    propostas = {
+        "alteradas": sorted(p for p in documentos.keys() & esperados.keys() if hashes[p] != esperados[p]["sha256"]),
+        "novas": sorted(documentos.keys() - esperados.keys()),
+        "removidas": sorted(esperados.keys() - documentos.keys()),
+    }
+    if ref_base is not None and any(propostas.values()):
+        conferir_base(repo, ref_base)
+    return {"ok": True, "documentos": len(documentos), "offline": True, "propostas": propostas}
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("repo", nargs="?", type=Path, default=Path.cwd())
+    parser.add_argument("--base", help="ref Git da base do PR; propostas preservam módulo e índice-base")
     args = parser.parse_args()
     try:
-        print(json.dumps(conferir(args.repo)))
+        print(json.dumps(conferir(args.repo, args.base)))
         return 0
-    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+    except BaseDePropostaInvalida:
+        print("Espelho inválido: proposta deve manter o índice-base.", file=sys.stderr)
+        return 1
+    except (OSError, ValueError, KeyError, TypeError, AttributeError, subprocess.CalledProcessError):
         # Não ecoa conteúdo de definições privadas no log público de ferramentas.
-        print("Espelho inválido: confira módulo, índice, JSON canônico e SHA-256 das definições.", file=sys.stderr)
+        print("Espelho inválido: confira módulo, índice, JSON canônico, definições e ref da base.", file=sys.stderr)
         return 1
 
 
