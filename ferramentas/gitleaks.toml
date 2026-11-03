@@ -1,3 +1,17 @@
 title = "Política padrão de segredos NEX7"
+
 [extend]
 useDefault = true
+
+# Exceções centrais, mantidas só aqui (o chamador não pode trazer configuração, ignore nem gitleaks:allow).
+# Cada uma cobre um formato que nunca é segredo e que as regras padrão confundem com chave.
+
+[[allowlists]]
+description = "Manifesto de hashes: nome de arquivo com extensão apontando para SHA-256 hexadecimal"
+regexTarget = "line"
+regexes = ['''^\s*"[^"\s]+\.[A-Za-z0-9]{1,8}"\s*:\s*"[0-9a-f]{64}"\s*,?\s*$''']
+
+[[allowlists]]
+description = "Token público de download de mídia do GitBook/Firebase em URL de procedência de imagem"
+regexTarget = "line"
+regexes = ['''alt=media&token=[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}''']
