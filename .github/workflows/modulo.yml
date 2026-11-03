@@ -32,7 +32,15 @@ jobs:
         run: python3 .nxt-ci/ferramentas/instalar_ci.py
       - name: Segredos em todo o histórico (sem configuração do chamador)
         run: gitleaks git . --config .nxt-ci/ferramentas/gitleaks.toml --gitleaks-ignore-path /dev/null --ignore-gitleaks-allow --redact --log-opts=--all
-      - name: Manifesto e SHA-256 das definições (offline)
-        run: python3 .nxt-ci/ferramentas/conferir_modulo.py .
+      - name: Forma e propostas de definição (offline)
+        env:
+          EVENTO: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          argumentos=(.)
+          if [[ "$EVENTO" == "pull_request" ]]; then
+            argumentos+=(--base "$BASE_SHA")
+          fi
+          python3 .nxt-ci/ferramentas/conferir_modulo.py "${argumentos[@]}"
       - name: Actionlint e zizmor dos workflows da casa
         run: python3 .nxt-ci/ferramentas/conferir_workflows.py

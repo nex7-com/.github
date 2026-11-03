@@ -49,8 +49,64 @@ regexTarget = "secret"
 regexes = ['''^[0-9a-f]{40}$''', '''^[0-9a-f]{64}$''']
 
 [[rules.allowlists]]
-description = "Lock ou variante de instalação: SHA-256 por função ou arquivo"
+description = "Lock, variante ou documentação Markdown de instalação: digest SHA-256"
 condition = "AND"
-paths = ['''(^|/)instalacoes/[^/]+/(lock|variantes)/.+\.json$''']
+paths = ['''(^|/)instalacoes/[^/]+/(lock|variantes)/.+\.json$''', '''(^|/)instalacoes/[^/]+/docs/[^/]+\.md$''']
 regexTarget = "secret"
 regexes = ['''^[0-9a-f]{64}$''']
+
+# Marcador sintético declarado no próprio valor, restrito a arquivos de teste.
+[[rules.allowlists]]
+description = "Credencial sintética declarada em teste autoral"
+condition = "AND"
+paths = ['''(^|/)(tests?/.*|[^/]*test[^/]*\.(mjs|js|py|php))$''']
+regexTarget = "secret"
+regexes = ['''^(wx-)?synthetic-[a-z0-9]+(-[a-z0-9]+)*$''']
+
+# Bytes repetidos do Buffer.alloc(32, 7), não material aleatório de chave.
+[[rules.allowlists]]
+description = "Base64 determinístico de Buffer.alloc(32, 7) em teste"
+condition = "AND"
+paths = ['''(^|/)tests/[^/]+\.test\.mjs$''']
+regexTarget = "secret"
+regexes = ['''^(BwcH){10}Bwc=?$''']
+
+# Placeholder declaratório de senha em teste de feature PHP.
+[[rules.allowlists]]
+description = "Placeholder senha-forte-NNN em teste PHP"
+condition = "AND"
+paths = ['''(^|/)tests/Feature/[^/]+Test\.php$''']
+regexTarget = "secret"
+regexes = ['''^senha-forte-[0-9]{3}$''']
+
+# Identificador de fixture explícito, não uma chave, no smoke do detector.
+[[rules.allowlists]]
+description = "Identificador declarado de fixture no smoke Python"
+condition = "AND"
+paths = ['''(^|/)publicacao_obsidian/smoke_regressoes\.py$''']
+regexTarget = "secret"
+regexes = ['''^(api_key=)?fixture_identifier$''']
+
+# Prefixo base64 de "fixture:" com sufixo ASCII, exclusivo do smoke do detector.
+[[rules.allowlists]]
+description = "Basic auth sintético declarado como fixture em base64"
+condition = "AND"
+paths = ['''(^|/)publicacao_obsidian/smoke_regressoes\.py$''']
+regexTarget = "secret"
+regexes = ['''^Zml4dHVyZT[op][A-Za-z0-9+/]+={0,2}$''']
+
+# Atributo ARIA de atalho de teclado, não atribuição de credencial.
+[[rules.allowlists]]
+description = "Atalho ARIA Shift+Escape citado em documentação"
+condition = "AND"
+paths = ['''\.md$''']
+regexTarget = "match"
+regexes = ['''^aria-keyshortcuts="Shift\+Escape"$''']
+
+# Vetor público: https://developer.work.weixin.qq.com/document/path/90968 e wework-crypt 1.0.1; SHA-256 chave 09a8e0fe098a621e54e4ebba827026f972cf2dc37d805b6cb172d01d525fd1eb, cifrado 180633cc68fdd0b9ff35f9cfcfeb7392391339e386bd0defdb91e7f2dc40948b.
+[[rules.allowlists]]
+description = "EncodingAESKey exato do vetor público WeCom em teste de envelope"
+condition = "AND"
+paths = ['''(^|/)tests/automation\.test\.mjs$''']
+regexTarget = "secret"
+regexes = ['''^\x6a\x57\x6d\x59\x6d\x37\x71\x72\x35\x6e\x4d\x6f\x41\x55\x77\x5a\x52\x6a\x47\x74\x42\x78\x6d\x7a\x33\x4b\x41\x31\x74\x6b\x41\x6a\x33\x79\x6b\x6b\x52\x36\x71\x32\x42\x32\x43$''']
