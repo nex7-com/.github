@@ -15,6 +15,10 @@ from pathlib import Path
 
 POLITICA = Path(__file__).resolve().parents[1] / "ferramentas/gitleaks.toml"
 GITLEAKS = shutil.which("gitleaks")
+# Literais montados em partes: o código-fonte deste teste não pode ter a forma que a regra padrão acusa.
+IDENTIFICADOR = "fixture" + "_identifier"
+ATALHO = "Shift+" + "Escape"
+SENHA_FIXA = "senha-forte-" + "123"
 
 
 def aleatorio(sorteio, alfabeto, tamanho):
@@ -68,9 +72,9 @@ def formatos_lote7(sorteio):
         "projetos/x/tests/wechat.test.mjs": f'const api_key = "wx-synthetic-{sufixo}";\n',
         "projetos/x/tests/automation.test.mjs": f'const key = "{base64.b64encode(bytes([7] * 32)).decode()}";\n',
         "tests/Feature/OrigemCadastroTest.php": f'$password = "senha-forte-{sorteio.randrange(100, 1000)}";\n',
-        "publicacao_obsidian/smoke_regressoes.py": 'caso = ("password", "api_key=fixture_identifier")\n',
+        "publicacao_obsidian/smoke_regressoes.py": f'caso = ("password", "api_key={IDENTIFICADOR}")\n',
         "projetos/x/publicacao_obsidian/smoke_regressoes.py": f'password = "{fixture}"\n',
-        "docs/RELATORIO.md": 'Atributo ARIA `aria-keyshortcuts="Shift+Escape"`.\n',
+        "docs/RELATORIO.md": f'Atributo ARIA `aria-keyshortcuts="{ATALHO}"`.\n',
     }
 
 
@@ -89,9 +93,9 @@ def controles_lote7(sorteio):
         "publicacao_obsidian/smoke_regressoes.py": f'caso = ("password", "api_key={aleatorio(sorteio, misto, 32)}")\n',
         "projetos/x/publicacao_obsidian/smoke_regressoes.py": f'password = "{basic}"\n',
         "docs/RELATORIO.md": f'aria-keyshortcuts="{aleatorio(sorteio, misto, 32)}"\n',
-        "config/OrigemCadastro.php": '$password = "senha-forte-123";\n',
-        "config/smoke.py": 'caso = ("password", "api_key=fixture_identifier")\n',
-        "config/aria.js": 'aria-keyshortcuts="Shift+Escape"\n',
+        "config/OrigemCadastro.php": f'$password = "{SENHA_FIXA}";\n',
+        "config/smoke.py": f'caso = ("password", "api_key={IDENTIFICADOR}")\n',
+        "config/aria.js": f'aria-keyshortcuts="{ATALHO}"\n',
     }
 
 
