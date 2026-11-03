@@ -9,9 +9,48 @@ useDefault = true
 [[allowlists]]
 description = "Manifesto de hashes: nome de arquivo com extensão apontando para SHA-256 hexadecimal"
 regexTarget = "line"
-regexes = ['''^\s*"[^"\s]+\.[A-Za-z0-9]{1,8}"\s*:\s*"[0-9a-f]{64}"\s*,?\s*$''']
+regexes = ['''^\s*"[^"\s]+\.[A-Za-z0-9]{1,12}"\s*:\s*"[0-9a-f]{64}"\s*,?\s*$''']
 
 [[allowlists]]
 description = "Token público de download de mídia do GitBook/Firebase em URL de procedência de imagem"
 regexTarget = "line"
 regexes = ['''alt=media&token=[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}''']
+
+[[allowlists]]
+description = "Caminho ou lista de palavras separadas por barra (kit_sugerido de agente, up/down/set): minúsculas, cada trecho começa por letra"
+regexTarget = "secret"
+regexes = ['''^[a-z][a-z0-9.-]*(?:/[a-z][a-z0-9._-]*){2,}$''']
+
+[[allowlists]]
+description = "UID de origem em manifesto de recurso: \"source_key\": \"<uuid>\""
+regexTarget = "line"
+regexes = ['''^\s*"source_key"\s*:\s*"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"\s*,?\s*$''']
+
+[[allowlists]]
+description = "Marcador ou nome, não valor: palavras maiúsculas com hífen (SYNTHETIC-ONLY) ou UPPER_SNAKE (NOME_DO_MODELO_4.5)"
+regexTarget = "secret"
+regexes = ['''^[A-Z]{2,}(?:-[A-Z]{2,})+$''', '''^[A-Z][A-Z0-9]*(?:_[A-Z0-9.]+)+$''']
+
+[[allowlists]]
+description = "Lista de identificadores entre aspas (\"check_login\", \"get_email_token1\"): o item seguinte não é valor atribuído"
+regexTarget = "match"
+regexes = ['''^[a-z][a-z0-9_]*",\s*"[a-z][a-z0-9]*(?:_[a-z0-9]+)+"$''']
+
+# Exceções que exigem lugar E formato juntos. No [[allowlists]] global o gitleaks 8.30.1 trata `paths` e `regexes`
+# como OU (o caminho sozinho liberaria o arquivo inteiro); na regra, `condition = "AND"` vale.
+[[rules]]
+id = "generic-api-key"
+
+[[rules.allowlists]]
+description = "Veredito JSON do rito das oficinas (familias, licenca, release): commit ou SHA-256 fixado"
+condition = "AND"
+paths = ['''(^|/)docs/pesquisa/(familias|licenca|release)/[^/]+\.json$''']
+regexTarget = "secret"
+regexes = ['''^[0-9a-f]{40}$''', '''^[0-9a-f]{64}$''']
+
+[[rules.allowlists]]
+description = "Lock ou variante de instalação: SHA-256 por função ou arquivo"
+condition = "AND"
+paths = ['''(^|/)instalacoes/[^/]+/(lock|variantes)/.+\.json$''']
+regexTarget = "secret"
+regexes = ['''^[0-9a-f]{64}$''']
