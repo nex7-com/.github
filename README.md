@@ -64,3 +64,11 @@ publicado no documento oficial 90968, restrito a `tests/automation.test.mjs`; a 
 da chave e do cifrado para conferir a procedência. Nenhuma exceção libera todos os arquivos de `tests/`
 ou de documentação.
 Os testes geram os valores e exercitam também controles parecidos que continuam acusados.
+
+Formatos adicionais cobertos pela mesma política: digests OCI de imagens `localhost/` em definições e payload
+gerados; identificadores de superfície `comfy-<uuid>` e `estoque-galpao-<id>` nos campos/comparações do laboratório
+de janela; digests de documentos `SRC-*` nos validadores de requisitos; a lista exata de três sentinelas
+minúsculas do redator Rust. A última exceção não aceita corpo PEM entre os marcadores, nem letras maiúsculas,
+nem outro arquivo. Os testes cobrem também esses limites. O fonte dos próprios testes deve passar em
+`gitleaks dir . --config ferramentas/gitleaks.toml --redact`: monte fixtures em tempo de execução, não grave
+no teste um literal com forma de segredo e não libere todo o diretório de testes.

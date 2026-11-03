@@ -99,6 +99,61 @@ def controles_lote7(sorteio):
     }
 
 
+def sentinelas_lote11():
+    nomes = ("begin private", "begin rsa private", "begin openai private")
+    return "".join(f'    "{"-" * 5}{nome} key{"-" * 5}",\n' for nome in nomes)
+
+
+def formatos_lote11(sorteio):
+    hexa = string.digits + "abcdef"
+    identificador = str(uuid.UUID(int=sorteio.getrandbits(128), version=4))
+    digest = aleatorio(sorteio, hexa, 64)
+    sentinelas = sentinelas_lote11()
+    estoque = "estoque-" + "galpao-" + aleatorio(sorteio, string.ascii_lowercase + string.digits, 16)
+    return {
+        ".plataforma/payload.json": json.dumps({"localhost/sentry-self-hosted-local": digest}, indent=2),
+        ".plataforma/definicoes/instalacoes/sentry-self-hosted/instalacao.json":
+            json.dumps({"localhost/sentry-self-hosted-local": digest}, indent=2),
+        "lab-janela-universal/JanelaUniversalLab.tsx": f'surfaceKey: "{estoque}",\n',
+        "lab-janela-universal/canvas/documento.ts": f'if (key === "{estoque}") return 1;\n',
+        "lab-janela-universal/config-janelas/a.json": json.dumps({"surfaceKey": f"comfy-{identificador}"}, indent=2),
+        "lab-janela-universal/config-janelas/b.json": json.dumps({"superficieKey": f"comfy-{identificador}"}, indent=2),
+        "lab-janela-universal/config-janelas/c.json": json.dumps({"surfaceKey": estoque}, indent=2),
+        "crates/gataka-core/src/redaction.rs": sentinelas,
+        "requirements-agents-models-alpha-v1-1/validate.sh": f'  "SRC-CLAUDE-AUTH": "{digest}",\n',
+        "requirements-agents-models-alpha-v1-2/validate.sh": f"  'SRC-CODEX-AUTH': '{digest}',\n",
+        "requirements-agents-models-alpha-v1-3/validate.sh": f"  'SRC-COVERAGE-AUTH': '{digest}',\n",
+    }
+
+
+def controles_lote11(sorteio):
+    hexa = string.digits + "abcdef"
+    misto = string.ascii_letters + string.digits
+    digest = aleatorio(sorteio, hexa, 64)
+    chave = aleatorio(sorteio, misto, 40)
+    sentinelas = sentinelas_lote11()
+    return {
+        ".plataforma/payload.json": json.dumps({"sentry_access_token": digest}, indent=2),
+        ".plataforma/definicoes/instalacoes/sentry-self-hosted/instalacao.json":
+            json.dumps({"api_secret": chave}, indent=2),
+        ".plataforma/outro.json": json.dumps({"localhost/sentry-self-hosted-local": digest}, indent=2),
+        ".plataforma/definicoes/instalacoes/sentry-self-hosted/outro.json":
+            json.dumps({"localhost/sentry-self-hosted-local": digest}, indent=2),
+        "lab-janela-universal/JanelaUniversalLab.tsx": f'surfaceKey: "{chave}",\n',
+        "lab-janela-universal/canvas/documento.ts": f'if (key === "{chave}") return 1;\n',
+        "lab-janela-universal/config-janelas/a.json": json.dumps({"surfaceKey": chave}, indent=2),
+        "lab-janela-universal/config-janelas/b.json": json.dumps({"superficieKey": chave}, indent=2),
+        "lab-janela-universal/config-janelas/c.json": json.dumps({"api_secret": chave}, indent=2),
+        "config/superficie.json": json.dumps({"surfaceKey": f"comfy-{uuid.UUID(int=sorteio.getrandbits(128), version=4)}"}),
+        "crates/gataka-core/src/redaction.rs": sentinelas.upper(),
+        "crates/gataka-core/src/chave.rs": sentinelas,
+        "requirements-agents-models-alpha-v1-1/validate.sh": f'  "SRC-CLAUDE-AUTH": "{chave}",\n',
+        "requirements-agents-models-alpha-v1-2/validate.sh": f"  'SRC-CODEX-AUTH': '{chave}',\n",
+        "requirements-agents-models-alpha-v1-3/validate.sh": f"  'SRC-COVERAGE-AUTH': '{chave}',\n",
+        "requirements-agents-models-alpha-v1-3/config.py": f"  'SRC-CODEX-AUTH': '{digest}',\n",
+    }
+
+
 @unittest.skipUnless(GITLEAKS, "gitleaks ausente (o CI instala a versão fixada antes dos testes)")
 class TestPoliticaCentral(unittest.TestCase):
     def setUp(self):
@@ -154,6 +209,28 @@ class TestPoliticaCentral(unittest.TestCase):
             "config/automation.mjs": arquivos[caminho],
         }
         self.assertEqual(self.acusados(controles, POLITICA, "wecom-controles"), set(controles))
+
+    def test_formatos_lote11_passam_e_cada_excecao_e_necessaria(self):
+        formatos = formatos_lote11(random.Random(20261103))
+        self.assertEqual(self.acusados(formatos, self.padrao, "lote11-padrao"), set(formatos))
+        self.assertEqual(self.acusados(formatos, POLITICA, "lote11-central"), set())
+
+    def test_controles_lote11_continuam_acusados(self):
+        controles = controles_lote11(random.Random(20261103))
+        self.assertEqual(self.acusados(controles, POLITICA, "lote11-controles"), set(controles))
+
+    def test_sentinela_nao_libera_corpo_pem_no_mesmo_arquivo(self):
+        sentinelas = sentinelas_lote11()
+        corpo = base64.b64encode(bytes(range(96))).decode()
+        casos = [
+            sentinelas.replace("\n", f'\n    "{corpo}",\n', 1),
+            "-" * 5 + "begin private " + "key" + "-" * 5 + "\n" + corpo
+            + "\n" + "-" * 5 + "end private " + "key" + "-" * 5,
+        ]
+        for n, conteudo in enumerate(casos):
+            caminho = "crates/gataka-core/src/redaction.rs"
+            with self.subTest(caso=n):
+                self.assertEqual(self.acusados({caminho: conteudo}, POLITICA, f"pem-{n}"), {caminho})
 
 
 if __name__ == "__main__":
