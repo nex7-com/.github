@@ -110,3 +110,41 @@ condition = "AND"
 paths = ['''(^|/)tests/automation\.test\.mjs$''']
 regexTarget = "secret"
 regexes = ['''^\x6a\x57\x6d\x59\x6d\x37\x71\x72\x35\x6e\x4d\x6f\x41\x55\x77\x5a\x52\x6a\x47\x74\x42\x78\x6d\x7a\x33\x4b\x41\x31\x74\x6b\x41\x6a\x33\x79\x6b\x6b\x52\x36\x71\x32\x42\x32\x43$''']
+
+# Identificadores de superfície da UI nos campos ou comparações do laboratório autoral.
+[[rules.allowlists]]
+description = "Identidade de superfície comfy UUID ou estoque galpão no lab de janela"
+condition = "AND"
+paths = ['''(^|/)lab-janela-universal/(JanelaUniversalLab\.tsx|canvas/documento\.ts|config-janelas/[^/]+\.json)$''']
+regexTarget = "match"
+regexes = ['''^(surfaceKey|superficieKey)"?\s*:\s*"comfy-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"$''', '''^(surfaceKey"?\s*:|key\s*===)\s*"estoque-galpao-[a-z0-9]+"$''']
+
+# SRC nomeia documentos clean-room; o valor é seu digest, não credencial de autenticação.
+[[rules.allowlists]]
+description = "Digest SHA-256 de documento SRC no validador de requisitos"
+condition = "AND"
+paths = ['''(^|/)requirements-agents-models-alpha-v1-[123]/validate\.sh$''']
+regexTarget = "line"
+regexes = ['''^\s*"SRC-[A-Z]+(?:-[A-Z]+)*"\s*:\s*"[0-9a-f]{64}"\s*,?\s*$''', '''^\s*'SRC-[A-Z]+(?:-[A-Z]+)*'\s*:\s*'[0-9a-f]{64}'\s*,?\s*$''']
+
+# Digest hexadecimal da imagem OCI local em definição/manifesto gerados, nunca token Sentry.
+[[rules]]
+id = "sentry-access-token"
+
+[[rules.allowlists]]
+description = "Digest SHA-256 de imagem OCI localhost no espelho gerado"
+condition = "AND"
+paths = ['''(^|/)\.plataforma/(payload\.json|definicoes/instalacoes/[^/]+/instalacao\.json)$''']
+regexTarget = "line"
+regexes = ['''^\s*"localhost/[a-z0-9][a-z0-9._-]*"\s*:\s*"[0-9a-f]{64}"\s*,?\s*$''']
+
+# Lista exata de três sentinelas minúsculas capturadas juntas; não aceita corpo PEM entre elas.
+[[rules]]
+id = "private-key"
+
+[[rules.allowlists]]
+description = "Lista sanitizada exata de marcadores do redator Rust"
+condition = "AND"
+paths = ['''(^|/)crates/gataka-core/src/redaction\.rs$''']
+regexTarget = "secret"
+regexes = ['''^-----begin private key-----",\s*"-----begin rsa private key-----",\s*"-----begin openai private key-----$''']
