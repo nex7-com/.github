@@ -2,6 +2,7 @@
 
 Os valores são gerados na hora (semente fixa) para que este arquivo não carregue nada com cara de segredo.
 """
+import base64
 import json
 import random
 import shutil
@@ -56,6 +57,44 @@ def segredos(sorteio):
     }
 
 
+def formatos_lote7(sorteio):
+    hexa = string.digits + "abcdef"
+    sufixo = aleatorio(sorteio, string.ascii_lowercase, 24)
+    fixture = base64.b64encode(("fixture:" + sufixo).encode()).decode()
+    return {
+        "instalacoes/cutter/docs/instalacao.md": f'API GitHub e conferido: `{aleatorio(sorteio, hexa, 64)}`\n',
+        "instalacoes/rizin/docs/release.md": f'api_secret = "{aleatorio(sorteio, hexa, 64)}"\n',
+        "projetos/x/tests/synthetic.test.mjs": f'const api_key = "synthetic-{sufixo}";\n',
+        "projetos/x/tests/wechat.test.mjs": f'const api_key = "wx-synthetic-{sufixo}";\n',
+        "projetos/x/tests/automation.test.mjs": f'const key = "{base64.b64encode(bytes([7] * 32)).decode()}";\n',
+        "tests/Feature/OrigemCadastroTest.php": f'$password = "senha-forte-{sorteio.randrange(100, 1000)}";\n',
+        "publicacao_obsidian/smoke_regressoes.py": 'caso = ("password", "api_key=fixture_identifier")\n',
+        "projetos/x/publicacao_obsidian/smoke_regressoes.py": f'password = "{fixture}"\n',
+        "docs/RELATORIO.md": 'Atributo ARIA `aria-keyshortcuts="Shift+Escape"`.\n',
+    }
+
+
+def controles_lote7(sorteio):
+    misto = string.ascii_letters + string.digits
+    hexa = string.digits + "abcdef"
+    senha = aleatorio(sorteio, misto, 28)
+    basic = base64.b64encode(("service:" + senha).encode()).decode()
+    return {
+        "instalacoes/cutter/docs/instalacao.md": f'api_secret = "{aleatorio(sorteio, misto, 40)}"\n',
+        "docs/instalacao.md": f'api_secret = "{aleatorio(sorteio, hexa, 64)}"\n',
+        "tests/synthetic.test.mjs": f'const api_key = "live-{aleatorio(sorteio, misto, 32)}";\n',
+        "tests/wechat.test.mjs": f'const api_key = "wx-live-{aleatorio(sorteio, misto, 32)}";\n',
+        "tests/automation.test.mjs": f'const key = "{base64.b64encode(bytes(sorteio.randrange(256) for _ in range(32))).decode()}";\n',
+        "tests/Feature/OrigemCadastroTest.php": f'$password = "senha-forte-{aleatorio(sorteio, misto, 20)}";\n',
+        "publicacao_obsidian/smoke_regressoes.py": f'caso = ("password", "api_key={aleatorio(sorteio, misto, 32)}")\n',
+        "projetos/x/publicacao_obsidian/smoke_regressoes.py": f'password = "{basic}"\n',
+        "docs/RELATORIO.md": f'aria-keyshortcuts="{aleatorio(sorteio, misto, 32)}"\n',
+        "config/OrigemCadastro.php": '$password = "senha-forte-123";\n',
+        "config/smoke.py": 'caso = ("password", "api_key=fixture_identifier")\n',
+        "config/aria.js": 'aria-keyshortcuts="Shift+Escape"\n',
+    }
+
+
 @unittest.skipUnless(GITLEAKS, "gitleaks ausente (o CI instala a versão fixada antes dos testes)")
 class TestPoliticaCentral(unittest.TestCase):
     def setUp(self):
@@ -73,7 +112,7 @@ class TestPoliticaCentral(unittest.TestCase):
         relatorio = self.raiz / (nome + ".json")
         resultado = subprocess.run([GITLEAKS, "dir", str(arvore), "--config", str(politica), "--no-banner", "--redact",
                                     "--exit-code", "7", "--report-format", "json", "--report-path", str(relatorio)],
-                                   capture_output=True, text=True)
+                                   check=False, capture_output=True, text=True)
         self.assertIn(resultado.returncode, (0, 7), resultado.stderr)
         return {str(Path(achado["File"]).relative_to(arvore)) for achado in json.loads(relatorio.read_text())}
 
@@ -85,6 +124,32 @@ class TestPoliticaCentral(unittest.TestCase):
     def test_segredos_continuam_recusados_mesmo_nos_lugares_com_excecao(self):
         valores = segredos(random.Random(20261103))
         self.assertEqual(self.acusados(valores, POLITICA, "central"), set(valores))
+
+    def test_formatos_lote7_passam_e_excecoes_detectaveis_sao_necessarias(self):
+        formatos = formatos_lote7(random.Random(20261103))
+        # Marcadores explícitos e bytes repetidos já ficam abaixo da heurística/entropia padrão.
+        ja_inofensivos = {f"projetos/x/tests/{nome}.test.mjs" for nome in ("synthetic", "wechat", "automation")}
+        self.assertEqual(self.acusados(formatos, self.padrao, "lote7-padrao"), set(formatos) - ja_inofensivos)
+        self.assertEqual(self.acusados(formatos, POLITICA, "lote7-central"), set())
+
+    def test_controles_parecidos_lote7_continuam_acusados(self):
+        controles = controles_lote7(random.Random(20261103))
+        self.assertEqual(self.acusados(controles, POLITICA, "lote7-controles"), set(controles))
+
+    def test_vetor_publico_wecom_so_valor_exato_e_so_no_teste(self):
+        # Fixture publicada no documento oficial 90968; reconstruída sem literal de credencial.
+        vetor = bytes.fromhex(
+            "6a576d596d377172356e4d6f4155775a526a477442786d7a334b4131746b416a33796b6b52367132423243"
+        ).decode()
+        caminho = "projetos/wecom/tests/automation.test.mjs"
+        arquivos = {caminho: f'const key = "{vetor}";\n'}
+        self.assertEqual(self.acusados(arquivos, self.padrao, "wecom-padrao"), {caminho})
+        self.assertEqual(self.acusados(arquivos, POLITICA, "wecom-central"), set())
+        controles = {
+            caminho: f'const key = "{vetor[:-1]}D";\n',
+            "config/automation.mjs": arquivos[caminho],
+        }
+        self.assertEqual(self.acusados(controles, POLITICA, "wecom-controles"), set(controles))
 
 
 if __name__ == "__main__":
