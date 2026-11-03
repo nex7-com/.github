@@ -12,7 +12,8 @@ COLECOES = {"oficinas": "oficina", "bancadas": "bancada", "estudios": "estudio",
 
 
 def canonico(objeto):
-    return (json.dumps(objeto, ensure_ascii=False, sort_keys=True, indent=2) + "\n").encode()
+    # Mesmos bytes do armazém de autoria do núcleo (`bff/armazem.py`): ordem das chaves preservada.
+    return (json.dumps(objeto, ensure_ascii=False, indent=2, allow_nan=False) + "\n").encode()
 
 
 def sem_duplicatas(pares):
@@ -54,15 +55,16 @@ def conferir(repo):
     casa = relativo(modulo["id"])
     partes = casa.split("/")
     if len(partes) == 3 and partes[0] == "desenvolvimento" and partes[1] not in {"empresas", "pessoas"}:
-        colecao = COLECOES.get(partes[1])
+        colecao = partes[1]
     elif len(partes) == 2 and partes[0] in {"empresas", "pessoas"}:
-        colecao = COLECOES[partes[0]]
+        colecao = partes[0]
     else:
         raise ValueError("id não é casa")
-    if not colecao or modulo.get("colecao") != colecao:
+    # `colecao` é o nome da coleção (plural, como no caminho); o repositório usa o singular.
+    if colecao not in COLECOES or modulo.get("colecao") != colecao:
         raise ValueError("coleção não corresponde à casa")
     uuid.UUID(modulo["uid"])
-    if modulo.get("repositorio") != f"nex7-com/{colecao}-{partes[-1]}":
+    if modulo.get("repositorio") != f"nex7-com/{COLECOES[colecao]}-{partes[-1]}":
         raise ValueError("repositório não corresponde à casa")
     if not isinstance(modulo.get("dependencias"), list) or not isinstance(modulo.get("plugins"), list):
         raise TypeError("dependências/plugins inválidos")

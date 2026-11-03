@@ -20,7 +20,7 @@ class TestEspelho(unittest.TestCase):
         (self.base / "definicoes").mkdir(parents=True)
         self.registro = {"id": "desenvolvimento/oficinas/teste", "uid": "00000000-0000-4000-8000-000000000001", "revisao": 1}
         self.modulo = {"schema": "nxt.plataforma.modulo.v1", "id": self.registro["id"], "uid": self.registro["uid"],
-                       "colecao": "oficina", "repositorio": "nex7-com/oficina-teste", "dependencias": [], "plugins": [],
+                       "colecao": "oficinas", "repositorio": "nex7-com/oficina-teste", "dependencias": [], "plugins": [],
                        "compativel_com": {"nucleo": ">=0", "design-system": ">=0"}}
         self.indice = {"schema": "nxt.plataforma.definicoes.v1", "documentos": [{"caminho": "_registro.json", "tipo": "registro",
                        "revisao": 1, "sha256": hashlib.sha256(verificador.canonico(self.registro)).hexdigest()}]}
@@ -36,11 +36,26 @@ class TestEspelho(unittest.TestCase):
 
     def test_titular_valido(self):
         self.registro["id"] = "pessoas/teste"
-        self.modulo.update(id="pessoas/teste", colecao="pessoa", repositorio="nex7-com/pessoa-teste")
+        self.modulo.update(id="pessoas/teste", colecao="pessoas", repositorio="nex7-com/pessoa-teste")
         self.indice["documentos"][0]["sha256"] = hashlib.sha256(verificador.canonico(self.registro)).hexdigest()
         self.gravar("modulo.json", self.modulo)
         self.gravar("definicoes/_registro.json", self.registro)
         self.gravar("definicoes/indice.json", self.indice)
+        self.assertTrue(verificador.conferir(self.repo)["ok"])
+
+    def test_colecao_no_singular_recusada(self):
+        self.modulo["colecao"] = "oficina"
+        self.gravar("modulo.json", self.modulo)
+        with self.assertRaises(ValueError):
+            verificador.conferir(self.repo)
+
+    def test_ordem_de_chaves_do_armazem(self):
+        # O núcleo grava como o armazém: indent 2, UTF-8, ordem de inserção (não ordenada).
+        modulo = {"schema": self.modulo["schema"], "uid": self.modulo["uid"], "id": self.modulo["id"],
+                  "colecao": "oficinas", "nome": "Teste ç", "repositorio": "nex7-com/oficina-teste",
+                  "versao": "0.0.0", "compativel_com": {"nucleo": ">=0", "design-system": ">=0"},
+                  "dependencias": [], "plugins": [], "aninhados": []}
+        (self.base / "modulo.json").write_text(json.dumps(modulo, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         self.assertTrue(verificador.conferir(self.repo)["ok"])
 
     def test_adulteracao(self):
