@@ -25,7 +25,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: nex7-com/.github
-          ref: f35e61a8835ce53a6898c42bb57f15ea28e84669 # commit da main com ferramentas/
+          ref: 9e2305b2ed976afb681497b41aaa9f83f0c4de81 # commit da main com ferramentas/
           path: .nxt-ci
           persist-credentials: false
       - name: Instalar versões fixadas no runner
