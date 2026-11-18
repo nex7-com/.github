@@ -75,8 +75,12 @@ def conferir(repo, ref_base=None):
         raise ValueError("schema de módulo inválido")
     casa = relativo(modulo["id"])
     partes = casa.split("/")
+    produto = (len(partes) == 5 and partes[:2] == ["desenvolvimento", "oficinas"]
+               and partes[3] == "produtos")
     if len(partes) == 3 and partes[0] == "desenvolvimento" and partes[1] not in {"empresas", "pessoas"}:
         colecao = partes[1]
+    elif produto:
+        colecao = "oficinas"
     elif len(partes) == 2 and partes[0] in {"empresas", "pessoas"}:
         colecao = partes[0]
     else:
@@ -85,8 +89,6 @@ def conferir(repo, ref_base=None):
     if colecao not in COLECOES or modulo.get("colecao") != colecao:
         raise ValueError("coleção não corresponde à casa")
     uuid.UUID(modulo["uid"])
-    if modulo.get("repositorio") != f"nex7-com/{COLECOES[colecao]}-{partes[-1]}":
-        raise ValueError("repositório não corresponde à casa")
     if not isinstance(modulo.get("dependencias"), list) or not isinstance(modulo.get("plugins"), list):
         raise TypeError("dependências/plugins inválidos")
     if set(modulo.get("compativel_com", {})) != {"nucleo", "design-system"}:
@@ -121,6 +123,21 @@ def conferir(repo, ref_base=None):
     registro = documentos.get("_registro.json", {})
     if registro.get("id") != casa or registro.get("uid") != modulo["uid"]:
         raise ValueError("registro raiz ausente ou divergente do módulo")
+    if produto and (registro.get("tipo") != "entidade" or registro.get("natureza") != "produto"):
+        raise ValueError("registro raiz não é produto")
+    if "repositorio" in registro:
+        repositorio = registro["repositorio"]
+        prefixo = f"nex7-com/{COLECOES[colecao]}-"
+        if (not isinstance(repositorio, str) or len(repositorio) > 108
+                or not re.fullmatch(re.escape(prefixo) + r"[a-z0-9][a-z0-9._-]*", repositorio)):
+            raise ValueError("repositório incompatível com a coleção")
+    elif produto:
+        raise ValueError("produto sem repositório próprio não é módulo autônomo")
+    else:
+        # Compatibilidade v1: só a ausência da identidade persistida permite derivar do slug.
+        repositorio = f"nex7-com/{COLECOES[colecao]}-{partes[-1]}"
+    if modulo.get("repositorio") != repositorio:
+        raise ValueError("repositório não corresponde ao registro")
     propostas = {
         "alteradas": sorted(p for p in documentos.keys() & esperados.keys() if hashes[p] != esperados[p]["sha256"]),
         "novas": sorted(documentos.keys() - esperados.keys()),
