@@ -33,6 +33,19 @@ class TestEspelho(unittest.TestCase):
     def gravar(self, caminho, objeto):
         (self.base / caminho).write_bytes(verificador.canonico(objeto))
 
+    def gravar_espelho(self):
+        self.indice["documentos"][0]["sha256"] = hashlib.sha256(verificador.canonico(self.registro)).hexdigest()
+        self.gravar("modulo.json", self.modulo)
+        self.gravar("definicoes/_registro.json", self.registro)
+        self.gravar("definicoes/indice.json", self.indice)
+
+    def produto(self):
+        self.registro.update(id="desenvolvimento/oficinas/zebra/produtos/zt231",
+                             tipo="entidade", natureza="produto", familia="oficina",
+                             repositorio="nex7-com/oficina-zebra-zt231")
+        self.modulo.update(id=self.registro["id"], repositorio=self.registro["repositorio"])
+        self.gravar_espelho()
+
     def test_valido(self):
         self.assertEqual(verificador.conferir(self.repo), {
             "ok": True, "documentos": 1, "offline": True,
@@ -120,6 +133,211 @@ class TestEspelho(unittest.TestCase):
         self.gravar("definicoes/indice.json", self.indice)
         with self.assertRaises(ValueError):
             verificador.conferir(self.repo)
+
+    def test_produto_registrado_com_repositorio_proprio(self):
+        self.produto()
+        self.assertEqual(verificador.conferir(self.repo), {
+            "ok": True, "documentos": 1, "offline": True,
+            "propostas": {"alteradas": [], "novas": [], "removidas": []},
+        })
+
+    def test_casa_renomeada_conserva_repositorio(self):
+        self.registro.update(id="desenvolvimento/oficinas/canon",
+                             repositorio="nex7-com/oficina-canon-eos-rebel-t7")
+        self.modulo.update(id=self.registro["id"], repositorio=self.registro["repositorio"])
+        self.gravar_espelho()
+        self.assertTrue(verificador.conferir(self.repo)["ok"])
+
+    def test_casa_v1_sem_identidade_persistida_conserva_regra_nominal(self):
+        self.modulo["repositorio"] = "nex7-com/oficina-outro"
+        self.gravar("modulo.json", self.modulo)
+        with self.assertRaises(ValueError):
+            verificador.conferir(self.repo)
+
+    def test_repositorio_recalculado_pelo_slug_recusado(self):
+        self.produto()
+        self.modulo["repositorio"] = "nex7-com/oficina-zt231"
+        self.gravar("modulo.json", self.modulo)
+        with self.assertRaisesRegex(ValueError, "repositório não corresponde ao registro"):
+            verificador.conferir(self.repo)
+
+    def test_produto_repositorio_e_uid_divergentes(self):
+        self.produto()
+        for campo, valor in (("repositorio", "nex7-com/oficina-outra"),
+                             ("uid", "00000000-0000-4000-8000-000000000002"),
+                             ("id", "desenvolvimento/oficinas/zebra/produtos/outro")):
+            with self.subTest(campo=campo):
+                self.modulo[campo] = valor
+                self.gravar("modulo.json", self.modulo)
+                with self.assertRaises(ValueError):
+                    verificador.conferir(self.repo)
+                self.modulo[campo] = self.registro[campo]
+
+    def test_produto_sem_repositorio_proprio_recusado(self):
+        self.produto()
+        del self.registro["repositorio"]
+        # Nem o nome legado derivado, nem o repositório herdado autorizam outro módulo.
+        for repositorio in ("nex7-com/oficina-zt231", "nex7-com/oficina-zebra"):
+            with self.subTest(repositorio=repositorio):
+                self.modulo["repositorio"] = repositorio
+                self.gravar_espelho()
+                with self.assertRaisesRegex(ValueError, "produto sem repositório próprio"):
+                    verificador.conferir(self.repo)
+
+    def test_posicao_de_produto_exige_registro_de_produto(self):
+        self.produto()
+        for campo, valor in (("tipo", "casa"), ("natureza", "entidade"), ("natureza", None)):
+            with self.subTest(campo=campo, valor=valor):
+                anterior = self.registro[campo]
+                self.registro[campo] = valor
+                self.gravar_espelho()
+                with self.assertRaisesRegex(ValueError, "registro raiz não é produto"):
+                    verificador.conferir(self.repo)
+                self.registro[campo] = anterior
+
+    def test_produto_recusa_segmentos_invalidos_e_entidade_reservada(self):
+        self.produto()
+        for entidade, slug in (("zebra", "Produto Invalido"), ("Zebra", "zt231"),
+                               ("zebra", "_zt231"), ("zebra", "zt231\n"),
+                               *((nome, "zt231") for nome in (
+                                   "agente", "abas", "projetos", "docs", "estudos", "csv",
+                                   "documentacao", "evidencias"))):
+            with self.subTest(entidade=entidade, slug=slug):
+                self.registro["id"] = self.modulo["id"] = f"desenvolvimento/oficinas/{entidade}/produtos/{slug}"
+                self.gravar_espelho()
+                with self.assertRaises(ValueError):
+                    verificador.conferir(self.repo)
+
+    def test_produto_aceita_segmentos_com_ponto_hifen_e_sublinhado(self):
+        self.produto()
+        self.registro["id"] = self.modulo["id"] = "desenvolvimento/oficinas/zebra_1.0/produtos/zt231_v2.0-1"
+        self.gravar_espelho()
+        self.assertTrue(verificador.conferir(self.repo)["ok"])
+
+    def test_produto_exige_familia_oficina(self):
+        self.produto()
+        for familia in (None, "bancada"):
+            with self.subTest(familia=familia):
+                if familia is None:
+                    self.registro.pop("familia")
+                else:
+                    self.registro["familia"] = familia
+                self.gravar_espelho()
+                with self.assertRaisesRegex(ValueError, "registro raiz não é produto"):
+                    verificador.conferir(self.repo)
+
+    def test_gramatica_nova_nao_altera_validacao_legada(self):
+        for slug in ("docs", "Teste Legado"):
+            with self.subTest(slug=slug):
+                self.registro["id"] = self.modulo["id"] = f"desenvolvimento/oficinas/{slug}"
+                self.modulo["repositorio"] = f"nex7-com/oficina-{slug}"
+                self.gravar_espelho()
+                self.assertTrue(verificador.conferir(self.repo)["ok"])
+
+    def test_formas_de_id_nao_autorizadas(self):
+        self.produto()
+        for ident in ("desenvolvimento/bancadas/zebra/produtos/zt231",
+                      "desenvolvimento/oficinas/zebra/produtos",
+                      "desenvolvimento/oficinas/zebra/produtos/zt231/extra",
+                      "desenvolvimento/oficinas/zebra/outros/zt231",
+                      "desenvolvimento/empresas/teste",
+                      "empresas/teste/produtos/zt231",
+                      "desenvolvimento/oficinas/zebra/produtos/../zt231"):
+            with self.subTest(ident=ident):
+                self.registro["id"] = self.modulo["id"] = ident
+                self.gravar_espelho()
+                with self.assertRaises(ValueError):
+                    verificador.conferir(self.repo)
+
+    def test_identidade_persistida_em_cada_colecao_e_titular(self):
+        for colecao, singular in verificador.COLECOES.items():
+            ident = (f"{colecao}/novo" if colecao in {"empresas", "pessoas"}
+                     else f"desenvolvimento/{colecao}/novo")
+            with self.subTest(colecao=colecao):
+                self.registro.update(id=ident, repositorio=f"nex7-com/{singular}-nome-antigo")
+                self.modulo.update(id=ident, colecao=colecao, repositorio=self.registro["repositorio"])
+                self.gravar_espelho()
+                self.assertTrue(verificador.conferir(self.repo)["ok"])
+
+    def test_repositorio_persistido_invalido_mesmo_igual_no_modulo(self):
+        self.produto()
+        for repositorio in ("outra-org/oficina-teste", "nex7-com/bancada-teste",
+                            "nex7-com/oficina-", "nex7-com/oficina-.teste",
+                            "nex7-com/oficina-Teste", "nex7-com/oficina-teste/extra",
+                            "nex7-com/oficina-teste\n", "nex7-com/oficina-" + "a" * 92,
+                            "", None, 42):
+            with self.subTest(repositorio=repositorio):
+                self.registro["repositorio"] = self.modulo["repositorio"] = repositorio
+                self.gravar_espelho()
+                with self.assertRaises(ValueError):
+                    verificador.conferir(self.repo)
+
+    def test_nome_valido_e_limite_do_schema_de_repositorio(self):
+        self.produto()
+        for repositorio in ("nex7-com/oficina-nome_antigo.v1", "nex7-com/oficina-" + "a" * 91):
+            with self.subTest(repositorio=repositorio):
+                self.registro["repositorio"] = self.modulo["repositorio"] = repositorio
+                self.gravar_espelho()
+                self.assertTrue(verificador.conferir(self.repo)["ok"])
+
+    def test_produto_proposta_preserva_base(self):
+        self.produto()
+        ref = self.base_git()
+        self.registro["revisao"] = 2
+        self.gravar("definicoes/_registro.json", self.registro)
+        self.assertEqual(verificador.conferir(self.repo, ref)["propostas"]["alteradas"], ["_registro.json"])
+        self.indice["documentos"][0]["revisao"] = 2
+        self.gravar_espelho()
+        self.gravar("definicoes/extra.json", {})
+        with self.assertRaises(verificador.BaseDePropostaInvalida):
+            verificador.conferir(self.repo, ref)
+
+    def test_produto_proposta_nao_troca_modulo(self):
+        self.produto()
+        ref = self.base_git()
+        self.registro["repositorio"] = self.modulo["repositorio"] = "nex7-com/oficina-outra"
+        self.gravar("modulo.json", self.modulo)
+        self.gravar("definicoes/_registro.json", self.registro)
+        with self.assertRaises(verificador.BaseDePropostaInvalida):
+            verificador.conferir(self.repo, ref)
+
+    def test_produto_nao_relaxa_symlink(self):
+        self.produto()
+        (self.base / "definicoes/link.json").symlink_to(self.base / "modulo.json")
+        with self.assertRaises(ValueError):
+            verificador.conferir(self.repo)
+
+    def test_produto_nao_relaxa_json_canonico_ou_duplicatas(self):
+        self.produto()
+        for conteudo in (json.dumps(self.registro), '{\n  "id": 1,\n  "id": 2\n}\n'):
+            with self.subTest(conteudo=conteudo):
+                (self.base / "definicoes/_registro.json").write_text(conteudo)
+                with self.assertRaises(ValueError):
+                    verificador.conferir(self.repo)
+
+    def test_produto_nao_relaxa_schema_modulo_ou_indice(self):
+        self.produto()
+        for caminho, objeto in (("modulo.json", self.modulo), ("definicoes/indice.json", self.indice)):
+            with self.subTest(caminho=caminho):
+                self.gravar(caminho, {**objeto, "schema": "invalido"})
+                with self.assertRaises(ValueError):
+                    verificador.conferir(self.repo)
+                self.gravar(caminho, objeto)
+
+    def test_erro_de_identidade_cli_nao_ecoa_valores(self):
+        self.produto()
+        marcador = "CONTEUDO_PRIVADO_NAO_ECOAR"
+        for campo in ("repositorio", "uid", "id"):
+            with self.subTest(campo=campo):
+                anterior = self.registro[campo]
+                self.registro[campo] = marcador
+                self.gravar_espelho()
+                resultado = self.cli()
+                self.assertEqual(resultado.returncode, 1)
+                self.assertEqual(resultado.stdout, "")
+                self.assertEqual(resultado.stderr, "Espelho inválido: confira módulo, índice, JSON canônico, definições e ref da base.\n")
+                self.assertNotIn(marcador, resultado.stderr)
+                self.registro[campo] = anterior
 
     def git(self, *args):
         return subprocess.run(["git", "-C", str(self.repo), *args], check=True,
