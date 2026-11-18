@@ -195,6 +195,45 @@ class TestEspelho(unittest.TestCase):
                     verificador.conferir(self.repo)
                 self.registro[campo] = anterior
 
+    def test_produto_recusa_segmentos_invalidos_e_entidade_reservada(self):
+        self.produto()
+        for entidade, slug in (("zebra", "Produto Invalido"), ("Zebra", "zt231"),
+                               ("zebra", "_zt231"), ("zebra", "zt231\n"),
+                               *((nome, "zt231") for nome in (
+                                   "agente", "abas", "projetos", "docs", "estudos", "csv",
+                                   "documentacao", "evidencias"))):
+            with self.subTest(entidade=entidade, slug=slug):
+                self.registro["id"] = self.modulo["id"] = f"desenvolvimento/oficinas/{entidade}/produtos/{slug}"
+                self.gravar_espelho()
+                with self.assertRaises(ValueError):
+                    verificador.conferir(self.repo)
+
+    def test_produto_aceita_segmentos_com_ponto_hifen_e_sublinhado(self):
+        self.produto()
+        self.registro["id"] = self.modulo["id"] = "desenvolvimento/oficinas/zebra_1.0/produtos/zt231_v2.0-1"
+        self.gravar_espelho()
+        self.assertTrue(verificador.conferir(self.repo)["ok"])
+
+    def test_produto_exige_familia_oficina(self):
+        self.produto()
+        for familia in (None, "bancada"):
+            with self.subTest(familia=familia):
+                if familia is None:
+                    self.registro.pop("familia")
+                else:
+                    self.registro["familia"] = familia
+                self.gravar_espelho()
+                with self.assertRaisesRegex(ValueError, "registro raiz não é produto"):
+                    verificador.conferir(self.repo)
+
+    def test_gramatica_nova_nao_altera_validacao_legada(self):
+        for slug in ("docs", "Teste Legado"):
+            with self.subTest(slug=slug):
+                self.registro["id"] = self.modulo["id"] = f"desenvolvimento/oficinas/{slug}"
+                self.modulo["repositorio"] = f"nex7-com/oficina-{slug}"
+                self.gravar_espelho()
+                self.assertTrue(verificador.conferir(self.repo)["ok"])
+
     def test_formas_de_id_nao_autorizadas(self):
         self.produto()
         for ident in ("desenvolvimento/bancadas/zebra/produtos/zt231",

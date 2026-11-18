@@ -75,8 +75,12 @@ def conferir(repo, ref_base=None):
         raise ValueError("schema de módulo inválido")
     casa = relativo(modulo["id"])
     partes = casa.split("/")
+    # Gramática offline de bff/estrutura_diretorios.py:34-63 (N2-GRAM), sem importar o núcleo.
     produto = (len(partes) == 5 and partes[:2] == ["desenvolvimento", "oficinas"]
-               and partes[3] == "produtos")
+               and partes[3] == "produtos"
+               and all(re.fullmatch(r"[a-z0-9][a-z0-9._-]*", parte) for parte in (partes[2], partes[4]))
+               and partes[2] not in {"agente", "abas", "projetos", "docs", "estudos", "csv",
+                                     "documentacao", "evidencias"})
     if len(partes) == 3 and partes[0] == "desenvolvimento" and partes[1] not in {"empresas", "pessoas"}:
         colecao = partes[1]
     elif produto:
@@ -123,7 +127,8 @@ def conferir(repo, ref_base=None):
     registro = documentos.get("_registro.json", {})
     if registro.get("id") != casa or registro.get("uid") != modulo["uid"]:
         raise ValueError("registro raiz ausente ou divergente do módulo")
-    if produto and (registro.get("tipo") != "entidade" or registro.get("natureza") != "produto"):
+    if produto and (registro.get("tipo") != "entidade" or registro.get("natureza") != "produto"
+                    or registro.get("familia") != "oficina"):
         raise ValueError("registro raiz não é produto")
     if "repositorio" in registro:
         repositorio = registro["repositorio"]
